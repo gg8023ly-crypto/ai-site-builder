@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>值班日志 · {{TITLE}}</title>
+  <meta name="description" content="{{NAME}} 的值班日志，记录每日工作状态。">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .log-page-header {
+      padding: 6rem 5% 2.5rem;
+      text-align: center;
+    }
+    .log-page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .log-page-header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+    .log-list {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 5% 5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .log-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      cursor: pointer;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .log-card:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 37, 99, 235), 0.08);
+    }
+    .log-card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.3rem;
+    }
+    .log-card-date {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      background: var(--bg-card2);
+      padding: 0.15rem 0.6rem;
+      border-radius: 20px;
+    }
+    .log-card-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .log-card-excerpt {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+      margin-top: 0.25rem;
+    }
+    .log-card-content {
+      display: none;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-card.expanded .log-card-content {
+      display: block;
+    }
+    .log-card-toggle {
+      font-size: 0.78rem;
+      color: var(--primary);
+      margin-top: 0.5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-card-toggle:hover { text-decoration: underline; }
+    .log-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 3rem 0;
+      font-size: 0.95rem;
+    }
+    .log-loading {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 2rem 0;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">{{TITLE}}</div>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/">首页</a></li>
+      <li><a href="/chat">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="/log" class="active">值班日志</a></li>
+    </ul>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <div class="log-page-header">
+    <h1>📋 值班日志</h1>
+    <p>{{NAME}} 的每日工作记录</p>
+  </div>
+
+  <div class="log-list" id="logList">
+    <div class="log-loading">加载中...</div>
+  </div>
+
+  <footer>
+    <p class="footer-text">{{TITLE}} · 24/7 在线服务</p>
+    <ul class="footer-links">
+      <li><a href="/">首页</a></li>
+      <li><a href="/chat">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="/log">值班日志</a></li>
+    </ul>
+    <p class="footer-text" style="margin-top:1rem;opacity:0.4;font-size:0.78rem;">
+      Powered by ai-site-builder · Made with 🌸
+    </p>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const toggle = document.getElementById('navToggle');
+    const links = document.getElementById('navLinks');
+    toggle.addEventListener('click', () => links.classList.toggle('open'));
+    links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => links.classList.remove('open')));
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function loadLogs() {
+      const container = document.getElementById('logList');
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        if (!data.ok || !data.data || data.data.length === 0) {
+          container.innerHTML = '<div class="log-empty">暂无值班日志</div>';
+          return;
+        }
+        container.innerHTML = data.data.map((log, i) => {
+          const hasContent = log.content && log.content.trim();
+          return `<div class="log-card" id="card-${i}">
+            <div class="log-card-header">
+              <span class="log-card-date">${escapeHtml(log.date || (log.created_at || '').slice(0, 10))}</span>
+              <span class="log-card-title">${escapeHtml(log.title)}</span>
+            </div>
+            ${log.excerpt ? `<div class="log-card-excerpt">${escapeHtml(log.excerpt)}</div>` : ''}
+            ${hasContent ? `
+              <div class="log-card-content" id="content-${i}">${escapeHtml(log.content)}</div>
+              <div class="log-card-toggle" onclick="toggleCard(${i})">展开查看详情 ▾</div>
+            ` : ''}
+          </div>`;
+        }).join('');
+      } catch (e) {
+        container.innerHTML = '<div class="log-empty">加载失败，请稍后重试</div>';
+      }
+    }
+
+    function toggleCard(i) {
+      const card = document.getElementById('card-' + i);
+      const toggle = card.querySelector('.log-card-toggle');
+      const expanded = card.classList.toggle('expanded');
+      toggle.textContent = expanded ? '收起 ▴' : '展开查看详情 ▾';
+    }
+
+    loadLogs();
+  </script>
+</body>
+</html>

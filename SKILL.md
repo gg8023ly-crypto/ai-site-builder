@@ -167,12 +167,15 @@ curl -s http://localhost:8891/api/config | jq .
 
 ```
 template/
-├── server.js         Express 服务，读 config.json 动态渲染
+├── server.js         Express 服务，读 config.json 动态渲染，SQLite 日志持久化
 ├── config.json       配置文件（名字/AI/功能开关/端口）
 ├── DESIGN.md         设计规范文档
-├── package.json      依赖声明
+├── package.json      依赖声明（含 better-sqlite3）
+├── data/             SQLite 数据库目录（.gitignore 忽略）
+│   └── site.db       值班日志数据库（自动创建）
 └── public/
-    ├── index.html    首页（Hero + 能力卡片 + 状态）
+    ├── index.html    首页（Hero + 能力卡片 + 状态 + 值班日志摘要）
+    ├── log.html      值班日志列表页（点击展开完整内容）
     ├── chat.html     聊天页（流式 AI 对话 + Markdown 渲染）
     ├── knowledge.html 知识库（占位页）
     ├── blog.html     博客（占位页）
@@ -189,6 +192,8 @@ scripts/
 | GET | `/api/config` | 返回公开配置（不含 apiKey） |
 | GET | `/api/status` | 返回在线状态和运行时间 |
 | POST | `/api/chat` | 代理转发 AI 对话（流式 SSE） |
+| GET | `/api/logs` | 获取最近 20 条值班日志 |
+| POST | `/api/logs` | 写入新日志（title, excerpt, content） |
 
 ### POST /api/chat
 
@@ -202,6 +207,69 @@ Request body:
 ```
 
 Response: Server-Sent Events (SSE) stream，格式与 OpenAI 兼容。
+
+### Step 6: Auto Daily Log (Recommended)
+
+值班日志支持 SQLite 持久化。Agent 可以通过以下三种方式自动写入每日日志：
+
+#### 方法 A：用 OpenClaw cron 每天凌晨自动写
+
+在 OpenClaw 中设置一个每日 cron job，让 Agent 在每天凌晨汇总当日工作并调用 API：
+
+```bash
+# 示例 cron：每天 00:05 执行
+# openclaw cron add --cron "5 0 * * *" --cmd "write-daily-log"
+```
+
+Agent 收到 cron 触发后，调用：
+
+```http
+POST http://localhost:8891/api/logs
+Content-Type: application/json
+
+{
+  "title": "2026-04-13 值班日志",
+  "excerpt": "今日概况：完成了 xxx 功能开发，处理了 yyy 问题。",
+  "content": "## 今日工作\n- xxx\n- xxx\n\n## 明日计划\n- xxx"
+}
+```
+
+响应示例：
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 1,
+    "date": "2026-04-13",
+    "title": "2026-04-13 值班日志",
+    "excerpt": "今日概况...",
+    "content": "## 今日工作\n...",
+    "created_at": "2026-04-13 00:05:01"
+  }
+}
+```
+
+#### 方法 B：Agent 在 HEARTBEAT.md 里加检查项
+
+在 `HEARTBEAT.md` 中添加：
+
+```markdown
+## 日志检查
+- [ ] 距离上次写日志超过 20 小时？调用 POST /api/logs 写入今日摘要
+```
+
+Agent 在心跳时检测到超时后，自动调用 API 写入日志，无需外部 cron。
+
+#### 方法 C：手动调 API 写入
+
+```bash
+curl -X POST http://localhost:8891/api/logs \
+  -H "Content-Type: application/json" \
+  -d '{"title":"今日日志","excerpt":"一句话概括","content":"详细内容..."}'
+```
+
+> 日志页面：访问 `/log` 查看所有日志，支持点击展开完整内容。
+> 数据文件：`data/site.db`（已加入 `.gitignore`，不会提交到 Git）。
 
 ## Customization Tips
 

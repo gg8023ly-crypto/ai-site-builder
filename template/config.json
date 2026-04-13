@@ -8,7 +8,8 @@
     "chat": true,
     "status": true,
     "knowledge": false,
-    "blog": false
+    "blog": false,
+    "log": true
   },
   "ai": {
     "baseUrl": "https://gw.yaoai.art/v1",

@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const Database = require('better-sqlite3');
 
 // Load config
 const configPath = path.join(__dirname, 'config.json');
@@ -9,10 +10,22 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 const app = express();
 app.use(express.json());
 
-// In-memory log store
-const logs = [
-  { time: new Date().toISOString(), text: '系统启动，一切正常 ✅' }
-];
+// SQLite setup
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const db = new Database(path.join(dataDir, 'site.db'));
+
+// Auto-create logs table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    title TEXT,
+    excerpt TEXT,
+    content TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -49,6 +62,10 @@ app.get('/blog', (req, res) => {
   if (!config.features.blog) return res.redirect('/');
   serveHtml('blog.html')(req, res);
 });
+app.get('/log', (req, res) => {
+  if (config.features.log === false) return res.redirect('/');
+  serveHtml('log.html')(req, res);
+});
 
 // API: Get public config (no apiKey)
 app.get('/api/config', (req, res) => {
@@ -80,22 +97,24 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// API: Get recent logs (last 10)
+// API: Get recent logs (last 20)
 app.get('/api/logs', (req, res) => {
-  const recent = logs.slice(-10).reverse();
-  res.json({ ok: true, data: recent });
+  const rows = db.prepare('SELECT * FROM logs ORDER BY id DESC LIMIT 20').all();
+  res.json({ ok: true, data: rows });
 });
 
 // API: Post a new log entry
 app.post('/api/logs', (req, res) => {
-  const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ ok: false, message: 'text is required' });
+  const { title, excerpt, content } = req.body;
+  if (!title) {
+    return res.status(400).json({ ok: false, message: 'title is required' });
   }
-  const entry = { time: new Date().toISOString(), text };
-  logs.push(entry);
-  // Keep max 100 entries in memory
-  if (logs.length > 100) logs.splice(0, logs.length - 100);
+  const date = req.body.date || new Date().toISOString().slice(0, 10);
+  const stmt = db.prepare(
+    'INSERT INTO logs (date, title, excerpt, content) VALUES (?, ?, ?, ?)'
+  );
+  const result = stmt.run(date, title, excerpt || '', content || '');
+  const entry = db.prepare('SELECT * FROM logs WHERE id = ?').get(result.lastInsertRowid);
   res.json({ ok: true, data: entry });
 });
 
@@ -180,6 +199,7 @@ app.listen(PORT, () => {
   console.log(`   Name:    ${config.name} ${config.avatar}`);
   console.log(`   Theme:   ${config.theme}`);
   console.log(`   Chat:    ${config.features.chat ? 'Enabled' : 'Disabled'}`);
+  console.log(`   Log:     ${config.features.log !== false ? 'Enabled' : 'Disabled'}`);
   console.log(`   AI:      ${config.ai.model}`);
   console.log('');
 });

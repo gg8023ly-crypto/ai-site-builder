@@ -42,10 +42,60 @@ fi
 echo "✅ npm $(npm -v)"
 
 # 3. Install dependencies
+# Note: better-sqlite3 ships prebuilt binaries for most platforms,
+# so npm install usually succeeds without any build tools.
+# If it fails (e.g. no matching prebuilt binary for this arch/OS),
+# we auto-detect the distro and install build tools as a fallback.
 echo ""
 echo "📦 Installing dependencies..."
-npm install --production
-echo "✅ Dependencies installed"
+if npm install --production 2>&1; then
+  echo "✅ Dependencies installed"
+else
+  echo ""
+  echo "⚠️  npm install failed (likely better-sqlite3 needs to compile from source)."
+  echo "   Auto-detecting system and installing build tools..."
+  echo ""
+
+  INSTALLED_BUILD_TOOLS=false
+
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "$ID" in
+      ubuntu|debian|linuxmint|pop)
+        echo "🔧 Detected Debian/Ubuntu — running: apt-get install -y build-essential python3"
+        apt-get install -y build-essential python3 && INSTALLED_BUILD_TOOLS=true
+        ;;
+      centos|rhel|fedora|opencloudos|anolis|rocky|almalinux)
+        echo "🔧 Detected RHEL/CentOS/OpenCloudOS — running: yum install -y gcc gcc-c++ make python3"
+        yum install -y gcc gcc-c++ make python3 && INSTALLED_BUILD_TOOLS=true
+        ;;
+      alpine)
+        echo "🔧 Detected Alpine — running: apk add build-base python3"
+        apk add --no-cache build-base python3 && INSTALLED_BUILD_TOOLS=true
+        ;;
+      *)
+        echo "❌ Unknown distro ($ID). Please manually install C++ build tools and Python 3,"
+        echo "   then re-run this script."
+        exit 1
+        ;;
+    esac
+  else
+    echo "❌ Cannot detect OS (/etc/os-release not found). Please install build tools manually."
+    exit 1
+  fi
+
+  if [ "$INSTALLED_BUILD_TOOLS" = true ]; then
+    echo ""
+    echo "🔄 Retrying npm install --production..."
+    if npm install --production 2>&1; then
+      echo "✅ Dependencies installed (with compiled native modules)"
+    else
+      echo "❌ npm install failed even after installing build tools."
+      echo "   Check the error above and ensure Node.js headers are available."
+      exit 1
+    fi
+  fi
+fi
 
 # 4. Check config.json
 CONFIG_FILE="./config.json"
