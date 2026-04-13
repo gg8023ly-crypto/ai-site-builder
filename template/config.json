@@ -1,0 +1,20 @@
+{
+  "name": "小虾",
+  "title": "小虾 · AI 助手",
+  "description": "我是XX公司的AI数字员工，24小时在线为您服务",
+  "avatar": "🦐",
+  "theme": "midnight",
+  "features": {
+    "chat": true,
+    "status": true,
+    "knowledge": false,
+    "blog": false
+  },
+  "ai": {
+    "baseUrl": "https://gw.yaoai.art/v1",
+    "apiKey": "",
+    "model": "gpt-5.4-mini",
+    "systemPrompt": "你是{name}，一个友好的AI助手。"
+  },
+  "port": 8891
+}

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}} · 对话</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-logo">{{TITLE}}</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/">首页</a></li>
+      <li><a href="/chat" class="active">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="/blog">博客</a></li>
+    </ul>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="chat-avatar" id="chatAvatar">{{AVATAR}}</div>
+      <div class="chat-info">
+        <h2>{{NAME}}</h2>
+        <p>在线 �� 随时可以对话</p>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="message assistant">
+        <p>你好！我是 {{NAME}} {{AVATAR}}，有什么我能帮你的吗？</p>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" placeholder="输入消息..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+      <button class="chat-send" id="chatSend" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+
+  <script>
+    // Mobile nav
+    const toggle = document.getElementById('navToggle');
+    const links = document.getElementById('navLinks');
+    toggle.addEventListener('click', () => links.classList.toggle('open'));
+
+    // Configure marked
+    marked.setOptions({ breaks: true, gfm: true });
+
+    const messagesEl = document.getElementById('chatMessages');
+    const inputEl = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('chatSend');
+    let conversationHistory = [];
+
+    // Auto-resize textarea
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+    });
+
+    function addMessage(role, content) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      if (role === 'assistant') {
+        div.innerHTML = marked.parse(content);
+      } else {
+        div.textContent = content;
+      }
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return div;
+    }
+
+    function showTyping() {
+      const div = document.createElement('div');
+      div.className = 'typing-indicator';
+      div.id = 'typingIndicator';
+      div.innerHTML = '<span></span><span></span><span></span>';
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function removeTyping() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      // Disable input
+      sendBtn.disabled = true;
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+
+      // Add user message
+      addMessage('user', text);
+      conversationHistory.push({ role: 'user', content: text });
+
+      // Show typing
+      showTyping();
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: conversationHistory })
+        });
+
+        removeTyping();
+
+        if (!res.ok) {
+          const err = await res.json();
+          addMessage('assistant', `⚠️ ${err.message || '请求失败，请稍后重试'}`);
+          sendBtn.disabled = false;
+          return;
+        }
+
+        // Handle streaming response
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        const msgDiv = addMessage('assistant', '');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  fullContent += delta;
+                  msgDiv.innerHTML = marked.parse(fullContent);
+                  messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
+              } catch (e) { /* skip non-JSON lines */ }
+            }
+          }
+        }
+
+        // Save assistant response to history
+        if (fullContent) {
+          conversationHistory.push({ role: 'assistant', content: fullContent });
+        }
+
+      } catch (err) {
+        removeTyping();
+        addMessage('assistant', '⚠️ 网络错误，请稍后重试');
+      }
+
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}} · 博客</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-logo">{{TITLE}}</a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/">首页</a></li>
+      <li><a href="/chat">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="/blog" class="active">博客</a></li>
+    </ul>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <div class="coming-soon">
+    <div class="icon">✍️</div>
+    <h1>博客</h1>
+    <p>{{NAME}} 的博客正在建设中，敬请期待...</p>
+    <a href="/" class="btn btn-outline">返回首页</a>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('navToggle');
+    const links = document.getElementById('navLinks');
+    toggle.addEventListener('click', () => links.classList.toggle('open'));
+  </script>
+</body>
+</html>

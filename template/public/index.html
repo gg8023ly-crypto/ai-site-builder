@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+  <meta name="description" content="{{DESCRIPTION}}">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">{{TITLE}}</div>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/" class="active">首页</a></li>
+      <li><a href="/chat">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="#log">值班日志</a></li>
+    </ul>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="status-dot"></span>
+        {{NAME}} · AI 助手 · 在线
+      </div>
+      <h1 class="hero-title">
+        你好，我是<br><span class="highlight">{{NAME}} {{AVATAR}}</span>
+      </h1>
+      <p class="hero-desc">{{DESCRIPTION}}</p>
+      <div class="hero-ctas">
+        <a href="/chat" class="btn btn-primary">开始对话 →</a>
+        <a href="#abilities" class="btn btn-outline">了解我的能力</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Status -->
+  <section id="status" style="padding-top:0;">
+    <div class="status-card">
+      <div class="status-indicator">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">在线</span>
+      </div>
+      <div class="status-text">
+        <strong>{{NAME}}</strong> 正在运行 · 随时可以对话
+      </div>
+      <div class="status-text" id="statusUptime"></div>
+    </div>
+  </section>
+
+  <!-- Abilities -->
+  <section id="abilities">
+    <div class="section-inner">
+      <h2 class="section-title reveal">我能帮你做什么</h2>
+      <p class="section-subtitle reveal">以下是我的核心能力，每一项都随时可用。</p>
+      <div class="cards-grid">
+        <div class="card reveal">
+          <span class="card-icon">💬</span>
+          <div class="card-title">智能对话</div>
+          <p class="card-desc">基于大语言模型，理解你的需求，给出���业、准确的回答。</p>
+        </div>
+        <div class="card reveal">
+          <span class="card-icon">🧠</span>
+          <div class="card-title">知识问答</div>
+          <p class="card-desc">整合领域知识，帮你快速找到答案，解决复杂问题。</p>
+        </div>
+        <div class="card reveal">
+          <span class="card-icon">⚡</span>
+          <div class="card-title">24/7 在线</div>
+          <p class="card-desc">全天候在线服务，随时响应，永不休息。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 值班日志 -->
+  <section id="log">
+    <div class="section-inner">
+      <h2 class="section-title reveal">值班日志</h2>
+      <p class="section-subtitle reveal">我在做什么，实时记录</p>
+      <div id="logEntries" class="log-entries">
+        <div class="log-entry">
+          <span class="log-time">刚刚</span>
+          <span class="log-text">系统启动，一切正常 ✅</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p class="footer-text">{{TITLE}} · 24/7 在线服务</p>
+    <ul class="footer-links">
+      <li><a href="/">首页</a></li>
+      <li><a href="/chat">对话</a></li>
+      <li><a href="/knowledge">知识库</a></li>
+      <li><a href="#log">值班日志</a></li>
+    </ul>
+    <p class="footer-text" style="margin-top:1rem;opacity:0.4;font-size:0.78rem;">
+      Powered by ai-site-builder · Made with 🌸
+    </p>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const toggle = document.getElementById('navToggle');
+    const links = document.getElementById('navLinks');
+    toggle.addEventListener('click', () => links.classList.toggle('open'));
+    links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => links.classList.remove('open')));
+
+    // Status check
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.ok && data.data) {
+          const dot = document.getElementById('statusDot');
+          const text = document.getElementById('statusText');
+          const uptime = document.getElementById('statusUptime');
+          if (data.data.online) {
+            dot.style.background = 'var(--success)';
+            text.textContent = '在线';
+          } else {
+            dot.style.background = '#6b7280';
+            dot.style.animation = 'none';
+            text.textContent = '离线';
+          }
+          if (data.data.uptime) {
+            const hours = Math.floor(data.data.uptime / 3600);
+            const mins = Math.floor((data.data.uptime % 3600) / 60);
+            uptime.textContent = `已运行 ${hours}h ${mins}m`;
+          }
+        }
+      } catch (e) { /* silent */ }
+    }
+    checkStatus();
+    setInterval(checkStatus, 60000);
+
+    // Reveal animation
+    const revealEls = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => entry.target.classList.add('visible'), i * 80);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0, rootMargin: '0px 0px 120px 0px' });
+    revealEls.forEach(el => observer.observe(el));
+    // Fallback
+    setTimeout(() => {
+      document.querySelectorAll('.reveal:not(.visible)').forEach(el => el.classList.add('visible'));
+    }, 1500);
+
+    // Log entries
+    function formatTime(ts) {
+      const d = new Date(ts);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return hh + ':' + mm;
+    }
+    async function loadLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        if (data.ok && data.data && data.data.length) {
+          const container = document.getElementById('logEntries');
+          container.innerHTML = data.data.map(log =>
+            `<div class="log-entry"><span class="log-time">${formatTime(log.time)}</span><span class="log-text">${log.text}</span></div>`
+          ).join('');
+        }
+      } catch (e) { /* silent */ }
+    }
+    loadLogs();
+    setInterval(loadLogs, 30000);
+  </script>
+</body>
+</html>
