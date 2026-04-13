@@ -49,6 +49,7 @@ cp -r ~/.openclaw/workspace/skills/ai-site-builder/template/ "$TARGET_DIR"
     "baseUrl": "https://your-api-provider.com/v1",
     "apiKey": "sk-your-api-key",
     "model": "gpt-4o-mini",
+    "format": "openai",
     "systemPrompt": "你是{name}，一个友好的AI助手。请用中文回答。"
   },
   "port": 8891
@@ -68,6 +69,7 @@ cp -r ~/.openclaw/workspace/skills/ai-site-builder/template/ "$TARGET_DIR"
 - `features.knowledge` — 设为 `true` 启用知识库页
 - `features.blog` — 设为 `true` 启用博客页
 - `ai.systemPrompt` — 系统提示词，`{name}` 会替换为站点名
+- `ai.format` — API 格式：`"openai"`（默认，适用于 OpenAI/DeepSeek/智谱/硅基流动/hongmacc 等）或 `"anthropic"`（适用于 Anthropic 原生/yaoai.art 等）
 
 ### Step 3: Customize Theme (Optional)
 

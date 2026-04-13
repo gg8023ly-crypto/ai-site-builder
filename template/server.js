@@ -136,25 +136,51 @@ app.post('/api/chat', async (req, res) => {
   // Build system prompt
   const systemPrompt = (config.ai.systemPrompt || '').replace(/\{name\}/g, config.name);
 
-  const apiMessages = [
-    { role: 'system', content: systemPrompt },
-    ...messages
-  ];
+  const format = config.ai.format || 'openai';
 
   try {
     const baseUrl = config.ai.baseUrl.replace(/\/+$/, '');
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.ai.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.ai.model,
-        messages: apiMessages,
-        stream: true
-      })
-    });
+
+    let response;
+
+    if (format === 'anthropic') {
+      // Anthropic Messages API
+      const anthropicMessages = messages.filter(m => m.role !== 'system');
+      response = await fetch(`${baseUrl}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.ai.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${config.ai.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.ai.model,
+          system: systemPrompt,
+          messages: anthropicMessages,
+          max_tokens: 4096,
+          stream: true
+        })
+      });
+    } else {
+      // OpenAI-compatible API (default)
+      const apiMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ];
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.ai.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.ai.model,
+          messages: apiMessages,
+          stream: true
+        })
+      });
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -170,14 +196,49 @@ app.post('/api/chat', async (req, res) => {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        res.write('data: [DONE]\n\n');
-        break;
+    if (format === 'anthropic') {
+      // Convert Anthropic SSE to OpenAI SSE format for frontend compatibility
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete last line
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            if (currentEvent === 'content_block_delta') {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const text = data?.delta?.text;
+                if (text) {
+                  const openaiChunk = JSON.stringify({
+                    choices: [{ delta: { content: text } }]
+                  });
+                  res.write(`data: ${openaiChunk}\n\n`);
+                }
+              } catch (_) {}
+            }
+            currentEvent = '';
+          }
+        }
       }
-      const chunk = decoder.decode(value, { stream: true });
-      res.write(chunk);
+      res.write('data: [DONE]\n\n');
+    } else {
+      // OpenAI format: pass through directly
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          res.write('data: [DONE]\n\n');
+          break;
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        res.write(chunk);
+      }
     }
 
     res.end();

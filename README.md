@@ -50,6 +50,7 @@ bash scripts/setup.sh
 | `ai.apiKey` | ✅ | AI API 密钥 |
 | `ai.baseUrl` | ✅ | API 地址（OpenAI 兼容） |
 | `ai.model` | ✅ | 模型名称 |
+| `ai.format` | - | API 格式：`openai`（默认）或 `anthropic` |
 | `port` | - | 端口号（默认 8891） |
 | `features.chat` | - | 聊天功能开关 |
 | `features.blog` | - | 博客页面开关 |
